@@ -9,6 +9,8 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/smtp"
+	"os"
 	"strings"
 )
 
@@ -34,7 +36,68 @@ func main() {
 }
 
 func handleFileMail(w http.ResponseWriter, r *http.Request) {
+	// Проверка MIME типа файла
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		log.Println("1")
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
 
+	fileBytes := bytes.Buffer{}
+	_, err = fileBytes.ReadFrom(file)
+	if err != nil {
+		log.Println("2")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Проверка списка почт
+	emails := r.FormValue("emails")
+
+	// Отправка файла по электронной почте
+	err = sendMailWithAttachment(emails, header.Filename, fileBytes.Bytes())
+	if err != nil {
+		log.Println("3")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func sendMailWithAttachment(recipients, filename string, fileData []byte) error {
+	from := os.Getenv("EMAIL_USERNAME")
+	password := os.Getenv("EMAIL_PASSWORD")
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+
+	auth := smtp.PlainAuth("", from, password, smtpHost)
+
+	// Формирование сообщения
+	message := []byte(fmt.Sprintf("Subject: File %s\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=MailBoundary\n\n--MailBoundary\nContent-Type: text/plain; charset=\"utf-8\"\n\nFile is attached.\n\n--MailBoundary\nContent-Disposition: attachment; filename=%s\nContent-Transfer-Encoding: base64\n\n%s\n--MailBoundary--", filename, filename, fileData))
+	log.Println(parseRecipients(recipients))
+	log.Println(fmt.Sprintf("%s:%s", smtpHost, smtpPort))
+	err := smtp.SendMail(fmt.Sprintf("%s:%s", smtpHost, smtpPort), auth, from, parseRecipients(recipients), message)
+	if err != nil {
+		log.Println("4")
+		return err
+	}
+	return nil
+}
+
+func parseRecipients(recipients string) []string {
+	emails := []string{}
+	for _, email := range splitEmails(recipients) {
+		emails = append(emails, email)
+	}
+	return emails
+}
+
+func splitEmails(emails string) []string {
+	// Можно использовать более сложную логику разбиения почт, например, разделение по запятым и удаление лишних пробелов.
+	return []string{emails}
 }
 
 func handleAddFilesArchive(w http.ResponseWriter, r *http.Request) {
