@@ -71,6 +71,10 @@ func handleArchiveInformation(w http.ResponseWriter, r *http.Request) {
 		totalSize += size
 		mimeType := ""
 
+		if strings.HasPrefix(filePath, "__MACOSX") {
+			continue
+		}
+
 		if strings.HasSuffix(filePath, ".docx") {
 			mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
