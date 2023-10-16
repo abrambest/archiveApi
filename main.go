@@ -2,10 +2,12 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"strings"
 )
@@ -25,8 +27,80 @@ type Response struct {
 }
 
 func main() {
+	http.HandleFunc("/api/mail/file", handleFileMail)
 	http.HandleFunc("/api/archive/information", handleArchiveInformation)
+	http.HandleFunc("/api/archive/files", handleAddFilesArchive)
 	http.ListenAndServe(":8080", nil)
+}
+
+func handleFileMail(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func handleAddFilesArchive(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseMultipartForm(2 << 20)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var validFiles []*multipart.FileHeader
+	for _, fileHeaders := range r.MultipartForm.File {
+		for _, fileHeader := range fileHeaders {
+			contentType := fileHeader.Header.Get("Content-Type")
+			if !isValidContentType(contentType) {
+				http.Error(w, "Недопустимый формат файла: "+fileHeader.Filename, http.StatusBadRequest)
+				return
+			}
+			validFiles = append(validFiles, fileHeader)
+		}
+	}
+
+	zipBuffer := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(zipBuffer)
+	for _, fileHeader := range validFiles {
+		file, err := fileHeader.Open()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer file.Close()
+
+		zipFile, err := zipWriter.Create(fileHeader.Filename)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		_, err = io.Copy(zipFile, file)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	err = zipWriter.Close()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/zip")
+	_, err = w.Write(zipBuffer.Bytes())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func isValidContentType(contentType string) bool {
+	validTypes := map[string]bool{
+		"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
+		"application/xml": true,
+		"image/jpeg":      true,
+		"image/png":       true,
+	}
+	return validTypes[contentType]
 }
 
 func handleArchiveInformation(w http.ResponseWriter, r *http.Request) {
