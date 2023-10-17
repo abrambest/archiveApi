@@ -36,7 +36,7 @@ func main() {
 }
 
 func handleFileMail(w http.ResponseWriter, r *http.Request) {
-	// Проверка MIME типа файла
+
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		log.Println("1")
@@ -53,10 +53,8 @@ func handleFileMail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверка списка почт
 	emails := r.FormValue("emails")
 
-	// Отправка файла по электронной почте
 	err = sendMailWithAttachment(emails, header.Filename, fileBytes.Bytes())
 	if err != nil {
 		log.Println("3")
@@ -75,7 +73,6 @@ func sendMailWithAttachment(recipients, filename string, fileData []byte) error 
 
 	auth := smtp.PlainAuth("", from, password, smtpHost)
 
-	// Формирование сообщения
 	message := []byte(fmt.Sprintf("Subject: File %s\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=MailBoundary\n\n--MailBoundary\nContent-Type: text/plain; charset=\"utf-8\"\n\nFile is attached.\n\n--MailBoundary\nContent-Disposition: attachment; filename=%s\nContent-Transfer-Encoding: base64\n\n%s\n--MailBoundary--", filename, filename, fileData))
 	log.Println(parseRecipients(recipients))
 	log.Println(fmt.Sprintf("%s:%s", smtpHost, smtpPort))
@@ -96,7 +93,7 @@ func parseRecipients(recipients string) []string {
 }
 
 func splitEmails(emails string) []string {
-	// Можно использовать более сложную логику разбиения почт, например, разделение по запятым и удаление лишних пробелов.
+
 	return []string{emails}
 }
 
