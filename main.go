@@ -39,7 +39,7 @@ func handleFileMail(w http.ResponseWriter, r *http.Request) {
 
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		log.Println("1")
+
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -48,7 +48,7 @@ func handleFileMail(w http.ResponseWriter, r *http.Request) {
 	fileBytes := bytes.Buffer{}
 	_, err = fileBytes.ReadFrom(file)
 	if err != nil {
-		log.Println("2")
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -57,7 +57,7 @@ func handleFileMail(w http.ResponseWriter, r *http.Request) {
 
 	err = sendMailWithAttachment(emails, header.Filename, fileBytes.Bytes())
 	if err != nil {
-		log.Println("3")
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -74,11 +74,10 @@ func sendMailWithAttachment(recipients, filename string, fileData []byte) error 
 	auth := smtp.PlainAuth("", from, password, smtpHost)
 
 	message := []byte(fmt.Sprintf("Subject: File %s\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=MailBoundary\n\n--MailBoundary\nContent-Type: text/plain; charset=\"utf-8\"\n\nFile is attached.\n\n--MailBoundary\nContent-Disposition: attachment; filename=%s\nContent-Transfer-Encoding: base64\n\n%s\n--MailBoundary--", filename, filename, fileData))
-	log.Println(parseRecipients(recipients))
-	log.Println(fmt.Sprintf("%s:%s", smtpHost, smtpPort))
+
 	err := smtp.SendMail(fmt.Sprintf("%s:%s", smtpHost, smtpPort), auth, from, parseRecipients(recipients), message)
 	if err != nil {
-		log.Println("4")
+
 		return err
 	}
 	return nil
